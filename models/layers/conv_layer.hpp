@@ -2,33 +2,30 @@
 #include <random>
 #include <vector>
 
-#include "../tensor/tensor.hpp"
+#include "layer.hpp"
 
 /// Convolutional layer
-class ConvLayer {
-    std::default_random_engine generator;
-    std::normal_distribution<double> distribution;
+class ConvLayer : Layer {
+    std::default_random_engine _generator;
+    std::normal_distribution<double> _distribution;
 
-    TensorSize inputSize;
-    TensorSize outputSize;
+    std::vector<Tensor> _filters;  // weights
+    std::vector<double> _bias;     // weights
 
-    std::vector<Tensor> filters;  // weights
-    std::vector<double> bias;     // weights
+    std::vector<Tensor> _filtersGradients;
+    std::vector<double> _biasGradients;
 
-    std::vector<Tensor> filtersGradients;
-    std::vector<double> biasGradients;
+    int _padding;
+    int _convStep;
 
-    int padding;
-    int convStep;
-
-    int filtersCount;
-    int filterSize;
-    int filterDepth;
+    int _filtersCount;
+    int _filterSize;
+    int _filterDepth;
 
     void _initWeights();
 
    public:
-    ConvLayer(TensorSize size, int fc, int fs, int padding, int convStep);
+    ConvLayer(TensorSize inputSize, int fc, int fs, int padding, int convStep);
 
     Tensor forward(const Tensor& inputTensor);
     Tensor backward(const Tensor& dout, const Tensor& inputTensor);

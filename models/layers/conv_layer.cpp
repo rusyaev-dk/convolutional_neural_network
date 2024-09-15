@@ -1,58 +1,63 @@
 #include "conv_layer.hpp"
 
-ConvLayer::ConvLayer(TensorSize size, int fc, int fs, int padding, int convStep)
-    : distribution(0.0, sqrt(2.0 / (fs * fs * size.depth))) {
-    this->inputSize = size;
+ConvLayer::ConvLayer(TensorSize inputSize, int fc, int fs, int padding,
+                     int convStep)
+    : Layer(inputSize),
+      _distribution(0.0, sqrt(2.0 / (fs * fs * inputSize.depth))) {
+    this->inputSize = inputSize;
 
-    this->outputSize.width = (size.width - fs + 2 * padding) / convStep + 1;
-    this->outputSize.height = (size.height - fs + 2 * padding) / convStep + 1;
+    this->outputSize.width =
+        (inputSize.width - fs + 2 * padding) / convStep + 1;
+    this->outputSize.height =
+        (inputSize.height - fs + 2 * padding) / convStep + 1;
     this->outputSize.depth = fc;
 
-    this->padding = padding;
-    this->convStep = convStep;
+    this->_padding = padding;
+    this->_convStep = convStep;
 
-    this->filtersCount = fc;
-    this->filterSize = fs;
-    this->filterDepth = size.depth;
+    this->_filtersCount = fc;
+    this->_filterSize = fs;
+    this->_filterDepth = inputSize.depth;
 
-    this->filters = std::vector<Tensor>(fc, Tensor(fs, fs, this->filterDepth));
-    this->filtersGradients =
-        std::vector<Tensor>(fc, Tensor(fs, fs, this->filterDepth));
+    this->_filters =
+        std::vector<Tensor>(fc, Tensor(fs, fs, this->_filterDepth));
+    this->_filtersGradients =
+        std::vector<Tensor>(fc, Tensor(fs, fs, this->_filterDepth));
 
-    // adding fc zeros fir bias weights и weights gradients
-    this->bias = std::vector<double>(fc, 0);
-    this->biasGradients = std::vector<double>(fc, 0);
+    // Add fc zeros fir bias weights и weights gradients
+    this->_bias = std::vector<double>(fc, 0);
+    this->_biasGradients = std::vector<double>(fc, 0);
 
     _initWeights();
 }
 
 void ConvLayer::_initWeights() {
-    // going through each of the filters
-    for (int index = 0; index < this->filtersCount; index++) {
-        for (int i = 0; i < this->filterSize; i++)
-            for (int j = 0; j < this->filterSize; j++)
-                for (int k = 0; k < this->filterDepth; k++)
-                    this->filters[index](k, i, j) = distribution(
-                        generator);  // generating a random number and write it
-                                     // into the filter element
+    // Go through each of the filters
+    for (int index = 0; index < this->_filtersCount; index++) {
+        for (int i = 0; i < this->_filterSize; i++)
+            for (int j = 0; j < this->_filterSize; j++)
+                for (int k = 0; k < this->_filterDepth; k++)
+                    this->_filters[index](k, i, j) = _distribution(
+                        _generator);  // Generate a random number and write it
+                                      // into the filter element
 
-        this->bias[index] = 0.01;  // all bias are set to 0.01
+        this->_bias[index] = 0.01;  // All bias are set to 0.01
     }
 }
 
 Tensor ConvLayer::forward(const Tensor& inputTensor) {
     Tensor output(outputSize);
 
-    for (int f = 0; f < this->filtersCount; f++) {
+    for (int f = 0; f < this->_filtersCount; f++) {
         for (int h = 0; h < this->outputSize.height; h++) {
             for (int w = 0; w < this->outputSize.width; w++) {
-                double sum = this->bias[f];  // adding bias to result sum
+                double sum = this->_bias[f];  // adding bias to result sum
 
-                // going through filters
-                for (int i = 0; i < this->filterSize; i++) {
-                    for (int j = 0; j < this->filterSize; j++) {
-                        int i_0 = this->convStep * h + i - this->padding;
-                        int j_0 = this->convStep * h + j - this->padding;
+                // Go through filters
+                for (int i = 0; i < this->_filterSize; i++) {
+                    for (int j = 0; j < this->_filterSize; j++) {
+                        int i_0 = this->_convStep * h + i - this->_padding;
+                        int j_0 = this->_convStep * h + j - this->_padding;
 
                         // Since the elements are zero outside the limits of the
                         // input tensor, just ignore them
@@ -63,9 +68,9 @@ Tensor ConvLayer::forward(const Tensor& inputTensor) {
 
                         // Go through the entire depth of the tensor and count
                         // the sum
-                        for (int d = 0; d < this->filterDepth; d++) {
+                        for (int d = 0; d < this->_filterDepth; d++) {
                             sum += inputTensor(d, i_0, j_0) *
-                                   this->filters[f](d, i_0, j_0);
+                                   this->_filters[f](d, i_0, j_0);
                         }
                     }
                 }
@@ -81,61 +86,61 @@ Tensor ConvLayer::forward(const Tensor& inputTensor) {
 Tensor ConvLayer::backward(const Tensor& dout, const Tensor& inputTensor) {
     TensorSize deltasSize;
 
-    deltasSize.height = this->convStep * (this->outputSize.height - 1) + 1;
-    deltasSize.width = this->convStep * (this->outputSize.width - 1) + 1;
+    deltasSize.height = this->_convStep * (this->outputSize.height - 1) + 1;
+    deltasSize.width = this->_convStep * (this->outputSize.width - 1) + 1;
     deltasSize.depth = this->outputSize.depth;
 
     Tensor deltas(deltasSize);
 
-    // Counting deltas
+    // Count deltas
     for (int d = 0; d < deltasSize.depth; d++) {
         for (int i = 0; i < deltasSize.height; i++) {
             for (int j = 0; j < deltasSize.width; j++) {
-                deltas(d, i * this->convStep, j * this->convStep) =
+                deltas(d, i * this->_convStep, j * this->_convStep) =
                     dout(d, i, j);
             }
         }
     }
 
-    // Counting gradients for weigths and bias
-    for (int f = 0; f < this->filtersCount; f++) {
+    // Count gradients for weigths and bias
+    for (int f = 0; f < this->_filtersCount; f++) {
         for (int h = 0; h < this->outputSize.height; h++) {
             for (int w = 0; w < this->outputSize.width; w++) {
                 double delta = deltas(f, h, w);  // Remember gradient value
 
-                for (int i = 0; i < this->filterSize; i++) {
-                    for (int j = 0; j < this->filterSize; j++) {
-                        int i_0 = i + h - this->padding;
-                        int j_0 = j + w - this->padding;
+                for (int i = 0; i < this->_filterSize; i++) {
+                    for (int j = 0; j < this->_filterSize; j++) {
+                        int i_0 = i + h - this->_padding;
+                        int j_0 = j + w - this->_padding;
 
-                        // ignore the elements that go beyond the borders
+                        // Ignore the elements that go beyond the borders
                         bool ignore =
                             (i_0 < 0 || i_0 >= this->inputSize.height) ||
                             (j_0 < 0 || j_0 >= this->inputSize.width);
                         if (ignore) continue;
 
-                        for (int d = 0; d < this->filterDepth; d++) {
-                            this->filtersGradients[f](d, i, j) +=
+                        for (int d = 0; d < this->_filterDepth; d++) {
+                            this->_filtersGradients[f](d, i, j) +=
                                 delta * inputTensor(d, i_0, j_0);
                         }
                     }
                 }
 
-                this->biasGradients[f] += delta;
+                this->_biasGradients[f] += delta;
             }
         }
     }
 
-    int pad = this->filterSize - 1 - this->padding;
+    int pad = this->_filterSize - 1 - this->_padding;
     Tensor inputTensorGradients(this->inputSize);
 
     for (int h = 0; h < this->inputSize.height; h++) {
         for (int w = 0; w < this->inputSize.width; w++) {
-            for (int d = 0; d < this->filterDepth; d++) {
+            for (int d = 0; d < this->_filterDepth; d++) {
                 double sum = 0;
 
-                for (int i = 0; i < this->filterSize; i++) {
-                    for (int j = 0; j < this->filterSize; j++) {
+                for (int i = 0; i < this->_filterSize; i++) {
+                    for (int j = 0; j < this->_filterSize; j++) {
                         int i_0 = h + i - pad;
                         int j_0 = w + j - pad;
 
@@ -143,13 +148,13 @@ Tensor ConvLayer::backward(const Tensor& dout, const Tensor& inputTensor) {
                                       (j_0 < 0 || j_0 >= deltasSize.width);
                         if (ignore) continue;
 
-                        for (int f = 0; f < this->filtersCount; f++) {
-                            sum +=
-                                this->filters[f](d, this->filtersCount - 1 - i,
-                                                 this->filtersCount - 1 - j) *
-                                deltas(f, i_0,
-                                       j_0);  // add the product of the turned
-                                              // filters to the deltas
+                        for (int f = 0; f < this->_filtersCount; f++) {
+                            sum += this->_filters[f](
+                                       d, this->_filtersCount - 1 - i,
+                                       this->_filtersCount - 1 - j) *
+                                   deltas(f, i_0,
+                                          j_0);  // add the product of the
+                                                 // turned filters to the deltas
                         }
                     }
                 }
@@ -163,26 +168,26 @@ Tensor ConvLayer::backward(const Tensor& dout, const Tensor& inputTensor) {
 }
 
 void ConvLayer::updateWeights(double alpha) {
-    for (int f = 0; f < this->filtersCount; f++) {
-        for (int i = 0; i < this->filterSize; i++) {
-            for (int j = 0; j < this->filterSize; j++) {
-                for (int d = 0; d < this->filterDepth; d++) {
-                    this->filters[f](d, i, j) -=
-                        alpha * this->filtersGradients[f](d, i, j);
-                    this->filtersGradients[f](d, i, j) =
+    for (int f = 0; f < this->_filtersCount; f++) {
+        for (int i = 0; i < this->_filterSize; i++) {
+            for (int j = 0; j < this->_filterSize; j++) {
+                for (int d = 0; d < this->_filterDepth; d++) {
+                    this->_filters[f](d, i, j) -=
+                        alpha * this->_filtersGradients[f](d, i, j);
+                    this->_filtersGradients[f](d, i, j) =
                         0;  // zero the filter gradient
                 }
             }
         }
-        this->bias[f] -= alpha * this->biasGradients[f];
-        this->bias[f] = 0;
+        this->_bias[f] -= alpha * this->_biasGradients[f];
+        this->_bias[f] = 0;
     }
 }
 
 void ConvLayer::setWeight(int filterIndex, int d, int i, int j, double weight) {
-    this->filters[filterIndex](d, i, j) = weight;
+    this->_filters[filterIndex](d, i, j) = weight;
 }
 
 void ConvLayer::setBias(int filterIndex, double bias) {
-    this->bias[filterIndex] = bias;
+    this->_bias[filterIndex] = bias;
 }

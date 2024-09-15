@@ -15,8 +15,8 @@ class ConvLayer {
     std::vector<Tensor> filters;  // weights
     std::vector<double> bias;     // weights
 
-    std::vector<Tensor> filtersGrad;
-    std::vector<double> biasGrad;
+    std::vector<Tensor> filtersGradients;
+    std::vector<double> biasGradients;
 
     int padding;
     int convStep;
@@ -25,12 +25,15 @@ class ConvLayer {
     int filterSize;
     int filterDepth;
 
-    void InitWeights();
+    void _initWeights();
 
    public:
     ConvLayer(TensorSize size, int fc, int fs, int padding, int convStep);
 
-    Tensor Forward(const Tensor& inputTensor);
-    Tensor Backward(const Tensor& dout, const Tensor& inputTensor);
-    void UpdateWeights(double learningRate);
+    Tensor forward(const Tensor& inputTensor);
+    Tensor backward(const Tensor& dout, const Tensor& inputTensor);
+    void updateWeights(double learningRate);
+
+    void setWeight(int filterIndex, int d, int i, int j, double weight);
+    void setBias(int filterIndex, double bias);
 };

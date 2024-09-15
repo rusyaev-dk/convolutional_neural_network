@@ -15,14 +15,14 @@ class Tensor {
 
     int dw;
 
-    void Init(int width, int height, int depth);
+    void _init(int width, int height, int depth);
 
    public:
     Tensor(int width, int height, int depth);
     Tensor(const TensorSize& size);
 
-    double& operator()(int i, int j, int k);
-    double operator()(int i, int j, int k) const;
+    double& operator()(int depth, int i, int j);
+    double operator()(int depth, int i, int j) const;
 
     TensorSize getSize() const;
 
